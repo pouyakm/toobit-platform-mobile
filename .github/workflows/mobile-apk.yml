@@ -1,6 +1,6 @@
 name: mobile-apk
 
-# STANDALONE-REPO VERSION: the repo root is the app (package.json at the root).
+# Layout-agnostic: finds the Expo app folder automatically (repo root, mobile/, or any subfolder up to 4 levels deep).
 # Builds an installable Android APK on GitHub-hosted runners (no Expo/EAS account needed).
 # Run manually (Actions tab -> mobile-apk -> Run workflow) or push a tag like mobile-v1.0.0 to also create a GitHub Release.
 on:
@@ -33,34 +33,56 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Locate the Expo app
+        id: locate
+        run: |
+          set -euo pipefail
+          APP=""
+          while IFS= read -r f; do
+            d=$(dirname "$f")
+            if grep -q '"expo"' "$f" && { [ -f "$d/app.config.ts" ] || [ -f "$d/app.config.js" ] || [ -f "$d/app.json" ]; }; then APP="$d"; break; fi
+          done < <(find . -maxdepth 4 -name package.json -not -path '*/node_modules/*' | sort)
+          if [ -z "$APP" ]; then
+            echo "::error::No Expo app found (package.json with expo + app.config.*). Repository contents:"
+            find . -maxdepth 3 -not -path './.git*' -not -path '*/node_modules*' | head -60
+            exit 1
+          fi
+          echo "Expo app at: $APP"
+          echo "APP_DIR=$APP" >> "$GITHUB_ENV"
+
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - uses: actions/cache@v4   # tolerant of a missing lockfile (setup-node's cache option hard-fails without one)
         with:
           path: ~/.npm
-          key: npm-mobile-${{ runner.os }}-${{ hashFiles('package*.json') }}
+          key: npm-mobile-${{ runner.os }}-${{ hashFiles('**/package.json', '**/package-lock.json') }}
           restore-keys: npm-mobile-${{ runner.os }}-
 
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
 
       - name: Install dependencies
+        working-directory: ${{ env.APP_DIR }}
         run: if [ -f package-lock.json ]; then npm ci; else npm install; fi
       - run: npm run typecheck
+        working-directory: ${{ env.APP_DIR }}
       - run: npm test -- --ci
+        working-directory: ${{ env.APP_DIR }}
 
       # Generates the native android/ project from app.config.ts (it is not committed).
       - run: npx expo prebuild --platform android --no-install --clean
+        working-directory: ${{ env.APP_DIR }}
 
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Build release APK
-        working-directory: android
+        working-directory: ${{ env.APP_DIR }}/android
         run: ./gradlew assembleRelease --no-daemon
 
       # Signing: with the 4 secrets below the APK is signed with YOUR release key (required for stable updates / Play).
       # Without them it keeps the template's debug signature: fine for testing, NOT for distribution.
       - name: Sign APK with release key (if secrets are set)
+        working-directory: ${{ env.APP_DIR }}
         env:
           KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
