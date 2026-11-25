@@ -1,0 +1,955 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Toobit Platform API",
+    "version": "1.0.0",
+    "description": "Dashboard-facing API. Source of truth for the generated TypeScript client (frontend/src/shared/api/schema.d.ts). CI regenerates it from the running API and fails on drift."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "required": [
+          "refreshToken"
+        ],
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          }
+        }
+      },
+      "TokenResponse": {
+        "type": "object",
+        "required": [
+          "accessToken",
+          "accessExpires",
+          "refreshToken",
+          "role"
+        ],
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "accessExpires": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "Admin",
+              "Trader",
+              "Viewer"
+            ]
+          }
+        }
+      },
+      "TrendingSymbol": {
+        "type": "object",
+        "required": [
+          "rank",
+          "symbol",
+          "score"
+        ],
+        "properties": {
+          "rank": {
+            "type": "integer"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "quoteVolume": {
+            "type": "number"
+          },
+          "momentum": {
+            "type": "number"
+          },
+          "volumeSpikeRatio": {
+            "type": "number"
+          },
+          "normVolume": {
+            "type": "number"
+          },
+          "normMomentum": {
+            "type": "number"
+          },
+          "normSpike": {
+            "type": "number"
+          },
+          "weightsJson": {
+            "type": "string"
+          },
+          "explanation": {
+            "type": "string"
+          }
+        }
+      },
+      "ScannerTop": {
+        "type": "object",
+        "required": [
+          "stale",
+          "items"
+        ],
+        "properties": {
+          "stale": {
+            "type": "boolean"
+          },
+          "lastSuccess": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrendingSymbol"
+            }
+          }
+        }
+      },
+      "OverrideRequest": {
+        "type": "object",
+        "required": [
+          "symbol",
+          "pinned"
+        ],
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PriceTick": {
+        "type": "object",
+        "required": [
+          "symbol",
+          "last"
+        ],
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "last": {
+            "type": "number"
+          },
+          "open": {
+            "type": "number"
+          },
+          "high": {
+            "type": "number"
+          },
+          "low": {
+            "type": "number"
+          },
+          "quoteVolume": {
+            "type": "number"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Prices": {
+        "type": "object",
+        "required": [
+          "wsConnected",
+          "marketDataStale",
+          "scannerStale",
+          "items"
+        ],
+        "properties": {
+          "wsConnected": {
+            "type": "boolean"
+          },
+          "marketDataStale": {
+            "type": "boolean"
+          },
+          "scannerStale": {
+            "type": "boolean"
+          },
+          "lastTickAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceTick"
+            }
+          }
+        }
+      },
+      "Position": {
+        "type": "object",
+        "required": [
+          "id",
+          "symbol",
+          "side",
+          "quantity"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "entryPrice": {
+            "type": "number"
+          },
+          "reconciledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "CloseRequest": {
+        "type": "object",
+        "required": [
+          "confirm",
+          "referencePrice"
+        ],
+        "properties": {
+          "confirm": {
+            "type": "boolean"
+          },
+          "referencePrice": {
+            "type": "number"
+          }
+        }
+      },
+      "CloseResponse": {
+        "type": "object",
+        "properties": {
+          "clientOrderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "required": [
+          "id",
+          "clientOrderId",
+          "symbol",
+          "stateMachineState"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "clientOrderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toobitOrderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "integer"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "limitPrice": {
+            "type": "number",
+            "nullable": true
+          },
+          "stopLoss": {
+            "type": "number"
+          },
+          "takeProfit": {
+            "type": "number"
+          },
+          "stateMachineState": {
+            "type": "integer",
+            "description": "OrderState enum index (Received=0 ... Unknown=9)"
+          },
+          "unknownRetries": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "OrderEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "from": {
+            "type": "integer"
+          },
+          "to": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Signal": {
+        "type": "object",
+        "required": [
+          "id",
+          "symbol",
+          "action"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "modelVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "featuresJson": {
+            "type": "string"
+          },
+          "explainJson": {
+            "type": "string"
+          },
+          "shadow": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RiskEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ReconciliationEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "pausedSymbol": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "KillSwitch": {
+        "type": "object",
+        "required": [
+          "on"
+        ],
+        "properties": {
+          "on": {
+            "type": "boolean"
+          }
+        }
+      },
+      "KillSwitchRequest": {
+        "type": "object",
+        "required": [
+          "on",
+          "reason",
+          "confirm"
+        ],
+        "properties": {
+          "on": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "string",
+            "description": "HALT to engage, RESUME to release"
+          }
+        }
+      },
+      "Flags": {
+        "type": "object",
+        "required": [
+          "automatedTrading",
+          "scannerWeightSet"
+        ],
+        "properties": {
+          "automatedTrading": {
+            "type": "boolean"
+          },
+          "scannerWeightSet": {
+            "type": "string"
+          }
+        }
+      },
+      "Settings": {
+        "type": "object",
+        "properties": {
+          "flags": {
+            "$ref": "#/components/schemas/Flags"
+          },
+          "strategy": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "scanner": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "editableAtRuntime": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearer": []
+    }
+  ],
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "security": [],
+        "operationId": "login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid credentials"
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "security": [],
+        "operationId": "refresh",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "rotated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid, expired or reused"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/api/scanner/top": {
+      "get": {
+        "operationId": "scannerTop",
+        "parameters": [
+          {
+            "name": "n",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "top N",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScannerTop"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scanner/overrides": {
+      "post": {
+        "operationId": "scannerOverride",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverrideRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/api/prices": {
+      "get": {
+        "operationId": "prices",
+        "responses": {
+          "200": {
+            "description": "live prices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Prices"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/positions": {
+      "get": {
+        "operationId": "positions",
+        "responses": {
+          "200": {
+            "description": "open positions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Position"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/positions/{symbol}/close": {
+      "post": {
+        "operationId": "closePosition",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders": {
+      "get": {
+        "operationId": "orders",
+        "responses": {
+          "200": {
+            "description": "orders",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Order"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders/{id}/events": {
+      "get": {
+        "operationId": "orderEvents",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "state transitions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderEvent"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/signals": {
+      "get": {
+        "operationId": "signals",
+        "responses": {
+          "200": {
+            "description": "signals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Signal"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/risk-events": {
+      "get": {
+        "operationId": "riskEvents",
+        "responses": {
+          "200": {
+            "description": "risk events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RiskEvent"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reconciliation-events": {
+      "get": {
+        "operationId": "reconciliationEvents",
+        "responses": {
+          "200": {
+            "description": "reconciliation events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReconciliationEvent"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/killswitch": {
+      "get": {
+        "operationId": "killSwitch",
+        "responses": {
+          "200": {
+            "description": "state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KillSwitch"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "setKillSwitch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KillSwitchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KillSwitch"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "confirmation mismatch"
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "operationId": "settings",
+        "responses": {
+          "200": {
+            "description": "settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/flags": {
+      "put": {
+        "operationId": "setFlags",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Flags"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/api/pauses": {
+      "get": {
+        "operationId": "pauses",
+        "responses": {
+          "200": {
+            "description": "paused symbols",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pauses/{symbol}": {
+      "delete": {
+        "operationId": "clearPause",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "cleared"
+          },
+          "404": {
+            "description": "not paused"
+          }
+        }
+      }
+    }
+  }
+}

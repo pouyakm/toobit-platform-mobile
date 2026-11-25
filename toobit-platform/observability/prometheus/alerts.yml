@@ -1,0 +1,30 @@
+groups:
+  - name: toobit
+    rules:
+      - alert: ScannerStale
+        expr: scanner_stale == 1
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: "Scanner is serving a stale snapshot" }
+      - alert: MarketDataStale
+        expr: market_data_age_seconds > 60
+        for: 1m
+        labels: { severity: warning }
+        annotations: { summary: "No WebSocket ticks for over 60s" }
+      - alert: ExchangeBan418
+        expr: increase(exchange_rate_limit_total{status="418"}[5m]) > 0
+        labels: { severity: critical }
+        annotations: { summary: "HTTP 418 from Toobit: IP banned. The kill switch is engaged automatically." }
+      - alert: ReconciliationDivergence
+        expr: increase(reconciliation_divergence_total[10m]) > 0
+        labels: { severity: critical }
+        annotations: { summary: "Local state diverged from the exchange; the symbol is paused" }
+      - alert: OrderQueueDropping
+        expr: increase(pipeline_queue_drops_total[5m]) > 0
+        labels: { severity: critical }
+        annotations: { summary: "Order queue overflow: intents are being dropped" }
+      - alert: SignalToSubmitSLOBreach
+        expr: histogram_quantile(0.95, sum(rate(signal_to_submit_latency_milliseconds_bucket[5m])) by (le)) > 2000
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "signal->submit p95 above the 2s SLO" }

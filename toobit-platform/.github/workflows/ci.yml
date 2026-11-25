@@ -1,0 +1,129 @@
+name: ci
+on:
+  pull_request:
+  push: { branches: [main] }
+permissions: { contents: read }
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 8.0.x }
+      - run: dotnet restore Toobit.sln
+      - run: dotnet build Toobit.sln -c Release --no-restore -warnaserror
+      - name: Vulnerable packages (fails on any)
+        run: |
+          dotnet list Toobit.sln package --vulnerable --include-transitive 2>&1 | tee vuln.txt
+          ! grep -q "has the following vulnerable packages" vuln.txt
+      - name: Unit tests + coverage
+        run: dotnet test tests/Toobit.UnitTests -c Release --no-build --collect:"XPlat Code Coverage" --results-directory TestResults
+      - name: Integration tests (Testcontainers Postgres, WireMock exchange)
+        run: dotnet test tests/Toobit.IntegrationTests -c Release --no-build
+      - name: Coverage gate (>= 80% line on Scanner, Risk, Execution/signal logic)
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:cov -reporttypes:"JsonSummary;Cobertura" \
+            -assemblyfilters:"+Risk;+MarketScanner;+Execution"
+          python3 - <<'PY'
+          import json,sys
+          s=json.load(open('cov/Summary.json'))['summary']
+          pct=s['linecoverage']; print('line coverage (Risk+MarketScanner+Execution):',pct)
+          sys.exit(0 if pct>=80 else 1)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: backend-coverage, path: backend/cov }
+      - name: Migrations exist and model has no pending changes
+        run: |
+          dotnet tool install -g dotnet-ef
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          test -d src/Infrastructure/Migrations || { echo "No migrations: run 'dotnet ef migrations add Initial -p src/Infrastructure -s src/Api'"; exit 1; }
+          dotnet ef migrations has-pending-model-changes -p src/Infrastructure -s src/Api --no-build
+
+  analytics:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: analytics } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - name: Tests + coverage gate (>= 80%)
+        run: pytest --cov=analytics --cov=signals --cov=backtesting --cov=ml --cov=app --cov-fail-under=80 --cov-report=xml
+      - run: bandit -q -r app analytics signals ml backtesting
+      - run: pip-audit -r requirements.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: analytics-coverage, path: analytics/coverage.xml }
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: mobile } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: mobile/package-lock.json }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test -- --ci
+      - name: Generated API types are up to date with contracts/openapi.json
+        run: npm run check:api && git diff --exit-code -- src/shared/api/schema.d.ts
+      - run: npm audit --audit-level=high
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Generated TS client is up to date with contracts/openapi.json
+        run: npm run check:api
+      - run: npm audit --audit-level=high
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r analytics/requirements-dev.txt
+      - name: .NET <-> Python signal contract (Python side; the .NET side runs in the backend job)
+        run: cd analytics && pytest tests/test_contract.py
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [backend, analytics, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y jq
+      - name: docker compose up -> mock Toobit -> simulated order -> assert DB trail
+        run: e2e/smoke.sh
+      - if: always()
+        run: docker compose -f docker-compose.yml -f e2e/docker-compose.e2e.yml logs --no-color > e2e.log
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: e2e-logs, path: e2e.log }
+      - if: always()
+        run: docker compose -f docker-compose.yml -f e2e/docker-compose.e2e.yml down -v

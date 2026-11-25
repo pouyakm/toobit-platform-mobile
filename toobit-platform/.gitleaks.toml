@@ -1,0 +1,7 @@
+title = "toobit-platform gitleaks"
+[extend]
+useDefault = true
+[allowlist]
+description = "Documented placeholders and test vectors (not real secrets)"
+paths = ['''\.env\.(dev|staging|prod)?\.?example$''', '''^backend/tests/''', '''^analytics/tests/''', '''^contracts/examples/''']
+regexes = ['''change-me[\w-]*''', '''dev-placeholder[\w-]*''', '''<provided-by-secret-manager>''']

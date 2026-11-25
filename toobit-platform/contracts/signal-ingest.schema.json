@@ -1,0 +1,12 @@
+{ "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "signal-ingest.schema.json", "title": "SignalIn (Python -> .NET POST /internal/signals)",
+  "type": "object", "additionalProperties": false,
+  "required": ["symbol", "action", "confidence", "referencePrice", "features", "explain"],
+  "properties": {
+    "symbol": { "type": "string", "pattern": "^[A-Z0-9]+-SWAP-USDT$" },
+    "action": { "enum": ["enter_long", "enter_short", "exit", "hold"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "referencePrice": { "type": "number", "exclusiveMinimum": 0 },
+    "modelVersion": { "type": ["string", "null"] },
+    "features": { "type": "object" },
+    "explain": { "type": "object", "required": ["methodology"], "properties": { "methodology": { "const": "options_proxy_v1" }, "top_features": { "type": "array" } } }
+  } }

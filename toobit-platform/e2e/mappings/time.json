@@ -1,0 +1,1 @@
+{ "priority": 5, "request": { "method": "GET", "urlPath": "/api/v1/time" }, "response": { "status": 200, "jsonBody": { "serverTime": 1700000000000 } } }

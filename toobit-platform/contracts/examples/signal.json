@@ -1,0 +1,1 @@
+{"symbol":"BTC-SWAP-USDT","action":"enter_long","confidence":0.8,"referencePrice":60000,"modelVersion":"trend@1.0.0+abcdef12","features":{"z":2.0,"iv_hv_ratio":1.1},"explain":{"methodology":"options_proxy_v1","reason":"trend-following entry","top_features":[{"name":"z","contribution":1.33}]}}

@@ -1,0 +1,99 @@
+name: cd
+on:
+  push: { branches: [main] }
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+env:
+  REGISTRY: ghcr.io
+  OWNER: ${{ github.repository_owner }}
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        run: echo "tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - name: Base images must be digest-pinned in prod builds
+        run: |
+          # Fails when a Dockerfile ARG *_IMAGE default is a bare tag. Pin with: docker buildx imagetools inspect <image:tag>
+          if [ "${{ vars.REQUIRE_DIGEST_PINS }}" = "true" ]; then
+            ! grep -HnE '^ARG [A-Z_]+_IMAGE=[^@]+$' backend/Dockerfile analytics/Dockerfile frontend/Dockerfile
+          fi
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: { registry: "${{ env.REGISTRY }}", username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: Build and push api / analytics / web
+        run: |
+          for svc in "api:backend" "analytics:analytics" "web:frontend"; do
+            name=${svc%%:*}; dir=${svc##*:}
+            docker buildx build "$dir" --push -t "$REGISTRY/$OWNER/toobit-$name:${GITHUB_SHA}"
+          done
+
+  migrate-and-deploy-staging:
+    needs: build-push
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 8.0.x }
+      - name: Build forward-only migration bundle and apply it (rollback scripts generated alongside)
+        env: { POSTGRES_CONNECTION: "${{ secrets.POSTGRES_CONNECTION }}" }
+        run: |
+          dotnet tool install -g dotnet-ef && export PATH="$PATH:$HOME/.dotnet/tools"
+          cd backend
+          dotnet ef migrations bundle -p src/Infrastructure -s src/Api -o efbundle --self-contained
+          dotnet ef migrations script --idempotent -p src/Infrastructure -s src/Api -o ../migrate-forward.sql
+          ./efbundle --connection "$POSTGRES_CONNECTION"
+      - uses: actions/upload-artifact@v4
+        with: { name: migration-scripts, path: migrate-forward.sql }
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /opt/toobit && git fetch -q && git checkout -q ${{ github.sha }}
+            export IMAGE_TAG=${{ needs.build-push.outputs.tag }} GHCR_OWNER=${{ github.repository_owner }}
+            docker compose -f docker-compose.yml -f deploy/compose.prod.yml pull
+            docker compose -f docker-compose.yml -f deploy/compose.prod.yml up -d --wait --wait-timeout 180
+      - name: Smoke tests against staging
+        env: { STAGING_URL: "${{ vars.STAGING_URL }}" }
+        run: |
+          curl -fsS "$STAGING_URL/health/live"
+          curl -fsS "$STAGING_URL/health/ready"
+          curl -fsS "$STAGING_URL/" -o /dev/null
+
+  promote-prod:
+    needs: [build-push, migrate-and-deploy-staging]
+    runs-on: ubuntu-latest
+    environment: production        # configure required reviewers on this environment = the approval gate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 8.0.x }
+      - name: Migrate (same bundle process as staging)
+        env: { POSTGRES_CONNECTION: "${{ secrets.POSTGRES_CONNECTION }}" }
+        run: |
+          dotnet tool install -g dotnet-ef && export PATH="$PATH:$HOME/.dotnet/tools"
+          cd backend && dotnet ef migrations bundle -p src/Infrastructure -s src/Api -o efbundle --self-contained && ./efbundle --connection "$POSTGRES_CONNECTION"
+      - name: Deploy (kill switch is engaged during rollout; Admin releases it after verifying)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /opt/toobit && git fetch -q && git checkout -q ${{ github.sha }}
+            export IMAGE_TAG=${{ needs.build-push.outputs.tag }} GHCR_OWNER=${{ github.repository_owner }}
+            docker compose -f docker-compose.yml -f deploy/compose.prod.yml pull
+            docker compose -f docker-compose.yml -f deploy/compose.prod.yml up -d --wait --wait-timeout 180
+      - name: Smoke
+        env: { PROD_URL: "${{ vars.PROD_URL }}" }
+        run: curl -fsS "$PROD_URL/health/ready"

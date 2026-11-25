@@ -1,0 +1,2 @@
+{ "priority": 5, "request": { "method": "POST", "urlPath": "/api/v2/futures/order" },
+  "response": { "status": 200, "headers": { "Content-Type": "application/json" }, "jsonBody": { "code": 200, "data": { "orderId": "mock-{{randomValue length=8 type='NUMERIC'}}" } }, "transformers": ["response-template"] } }

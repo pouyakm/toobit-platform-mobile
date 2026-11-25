@@ -1,0 +1,20 @@
+:root { --bg:#fff; --fg:#14181f; --muted:#4a5568; --line:#cbd2dc; --accent:#0b5cad; --danger:#b42318; --warn-bg:#fff4d6; --warn-fg:#5c3b00; color-scheme: light dark; }
+@media (prefers-color-scheme: dark) { :root { --bg:#10141b; --fg:#e8ecf2; --muted:#a8b3c4; --line:#2c3646; --accent:#6db1ff; --danger:#ff8a80; --warn-bg:#3a2c00; --warn-fg:#ffe29a; } }
+* { box-sizing: border-box }
+body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, sans-serif }
+:focus-visible { outline:3px solid var(--accent); outline-offset:2px }  /* visible focus: WCAG 2.4.7 */
+.sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap }
+.skip { position:absolute; inset-inline-start:-999px } .skip:focus { inset-inline-start:8px; top:8px; background:var(--bg); padding:8px; z-index:20 }
+.top { display:flex; gap:16px; align-items:center; flex-wrap:wrap; padding:8px 16px; border-bottom:1px solid var(--line) }
+.top nav { display:flex; gap:12px; flex:1; flex-wrap:wrap } .top a { color:var(--accent); padding:4px 2px } .top a.active { font-weight:700; text-decoration:underline }
+main { padding:16px; max-width:1100px; margin:auto }
+.banner { padding:0 16px } .banner.warn { background:var(--warn-bg); color:var(--warn-fg); padding:8px 16px; border-bottom:1px solid var(--line); font-weight:600 }
+table { width:100%; border-collapse:collapse } th,td { text-align:start; padding:8px; border-bottom:1px solid var(--line) }
+button,select,input { font:inherit; padding:6px 10px; min-height:36px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg) }
+button { cursor:pointer } button.danger { border-color:var(--danger); color:var(--danger) } button:disabled { opacity:.5; cursor:not-allowed }
+.overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); display:grid; place-items:center; z-index:10 }
+.dialog { background:var(--bg); padding:20px; border-radius:10px; max-width:440px; width:calc(100% - 32px); display:grid; gap:12px } .row { display:flex; gap:8px; justify-content:flex-end }
+.login { display:grid; place-items:center; min-height:100vh } .login form { display:grid; gap:12px; width:min(360px, 90vw) } .login label,.login input { display:grid; gap:4px }
+.err { color:var(--danger); margin:0 } .metric { display:grid; grid-template-columns:120px 1fr 48px; gap:8px; align-items:center } .pill { padding:2px 8px; border-radius:99px; border:1px solid var(--line) }
+.s-Unknown { border-color:var(--danger); color:var(--danger); font-weight:700 } code { display:block; padding:8px; overflow-x:auto }
+@media (max-width:640px) { th,td { padding:6px 4px; font-size:14px } }

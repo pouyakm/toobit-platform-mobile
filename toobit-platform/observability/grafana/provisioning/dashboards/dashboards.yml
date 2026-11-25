@@ -1,0 +1,3 @@
+apiVersion: 1
+providers:
+  - { name: toobit, folder: Toobit, type: file, options: { path: /var/lib/grafana/dashboards } }

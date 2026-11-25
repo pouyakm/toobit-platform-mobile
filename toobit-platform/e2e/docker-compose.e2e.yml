@@ -1,0 +1,16 @@
+# Overlay: swaps real Toobit for a WireMock simulated exchange. Used by e2e/smoke.sh and CI.
+services:
+  mock-toobit:
+    image: wiremock/wiremock:3.9.1
+    command: ["--global-response-templating", "--verbose"]
+    volumes: ["./e2e/mappings:/home/wiremock/mappings:ro"]
+    ports: ["8089:8080"]
+  api:
+    environment:
+      Toobit__BaseUrl: http://mock-toobit:8080
+      Ws__Url: ws://mock-toobit:8080/ws-unavailable   # no WS on the mock: the feed reconnects with backoff (also exercises that path)
+      Scanner__IntervalSeconds: "5"
+      Scanner__MinQuoteVolume: "0"
+      Reconciliation__IntervalSeconds: "5"
+    depends_on:
+      mock-toobit: { condition: service_started }
