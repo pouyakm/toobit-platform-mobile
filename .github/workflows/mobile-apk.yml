@@ -1,5 +1,6 @@
 name: mobile-apk
 
+# STANDALONE-REPO VERSION: the repo root is the app (package.json at the root).
 # Builds an installable Android APK on GitHub-hosted runners (no Expo/EAS account needed).
 # Run manually (Actions tab -> mobile-apk -> Run workflow) or push a tag like mobile-v1.0.0 to also create a GitHub Release.
 on:
@@ -25,7 +26,6 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: write   # only used to attach the APK to a Release on tag builds
-    defaults: { run: { working-directory: mobile } }
     env:
       ALLOW_CLEARTEXT: '0'   # release APKs never allow plain http
       VERSION_CODE: ${{ github.run_number }}
@@ -38,7 +38,7 @@ jobs:
       - uses: actions/cache@v4   # tolerant of a missing lockfile (setup-node's cache option hard-fails without one)
         with:
           path: ~/.npm
-          key: npm-mobile-${{ runner.os }}-${{ hashFiles('mobile/package*.json') }}
+          key: npm-mobile-${{ runner.os }}-${{ hashFiles('package*.json') }}
           restore-keys: npm-mobile-${{ runner.os }}-
 
       - uses: actions/setup-java@v4
@@ -55,7 +55,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Build release APK
-        working-directory: mobile/android
+        working-directory: android
         run: ./gradlew assembleRelease --no-daemon
 
       # Signing: with the 4 secrets below the APK is signed with YOUR release key (required for stable updates / Play).
